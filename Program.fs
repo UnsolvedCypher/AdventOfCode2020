@@ -296,7 +296,24 @@ module Day5 =
         )
         |> Seq.exactlyOne
 
+module Day6 =
+    let countGroupAnswers (group: string) =
+        group.Replace("\n", "")
+        |> Set.ofSeq
+        |> Set.count
+
+    let countGroupAnswers2 (group: string) =
+        group.Split("\n")
+        |> Array.map Set.ofSeq
+        |> Set.intersectMany
+        |> Set.count
+
+    let runner () =
+        String.Join("\n", IO.File.ReadAllLines "day6.txt").Split("\n\n")
+        // change this to countGroupAnswers2 for part 2
+        |> Array.sumBy countGroupAnswers
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day4.runner())
+    printfn "%A" (Day6.runner())
     0 // return an integer exit code
