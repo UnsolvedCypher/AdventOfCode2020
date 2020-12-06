@@ -2,9 +2,6 @@
 
 open System
 
-// Don't look at this solution. It isn't very good- either it is not a good
-// fit for functional programming or (more likely) I am not thinking about
-// it correctly in a functional way
 module Day1 =
     let inputList =
         IO.File.ReadAllLines "day1.txt"
@@ -12,43 +9,40 @@ module Day1 =
         |> List.ofArray
         |> List.sort
 
-    let rec part1 firstList secondList =
-        match firstList with
-        | firstNum :: firstRest ->
-            match secondList with
-            | secondNum :: secondRest ->
-                match firstNum + secondNum with
-                | 2020 ->
-                    firstNum * secondNum
-                | x when x > 2020 ->
-                    part1 firstRest inputList
-                | _ ->
-                    part1 firstList secondRest
-            | [] ->
-                part1 firstRest inputList
-        | [] -> failwith("No solution found")
+    let rec sumIntWithList (num: int) numList sumTo =
+        match numList with
+        | first :: rest ->
+            match num + first with
+            | x when x = sumTo ->
+                Some (num * first)
+            | x when x > sumTo ->
+                None
+            | _ ->
+                sumIntWithList num rest sumTo
+        | [] ->
+            None
 
-    let rec part2 firstList secondList thirdList =
+    let rec sumTwoNumsInList firstList secondList sumTo =
         match firstList with
-        | firstNum :: firstRest ->
-            match secondList with
-            | secondNum :: secondRest ->
-                match thirdList with
-                | thirdNum :: thirdRest ->
-                    match firstNum + secondNum + thirdNum with
-                    | 2020 ->
-                        firstNum * secondNum * thirdNum
-                    | x when x > 2020 ->
-                        part2 firstList secondRest inputList
-                    | _ when firstNum + secondNum > 2020 ->
-                        part2 firstRest inputList inputList
-                    | _ ->
-                        part2 firstList secondList thirdRest
-                | [] ->
-                    part2 firstList secondRest inputList
-            | [] ->
-                part2 firstRest inputList inputList
-        | [] -> failwith("No solution found")
+        | first :: rest ->
+            match sumIntWithList first secondList sumTo with
+            | Some x -> Some x
+            | None -> sumTwoNumsInList rest secondList sumTo
+        | [] ->
+            None
+
+    let rec sumThreeNumsInList firstList secondList thirdList sumTo =
+        match firstList with
+        | first :: rest ->
+            match sumTwoNumsInList secondList thirdList (sumTo - first) with
+            | Some x -> Some (x * first)
+            | None -> sumThreeNumsInList rest secondList thirdList sumTo
+        | [] ->
+            None
+
+    let runner () =
+        sumTwoNumsInList inputList inputList 2020,
+        sumThreeNumsInList inputList inputList inputList 2020
 
 module Day2 =
     type PasswordSpec = {
@@ -84,10 +78,9 @@ module Day2 =
             <> (spec.Password.[spec.Maximum - 1] = spec.Letter)
 
     // for part 2, just change checkSpec to checkSpec2
-    let numValidPasswords() =
+    let runner() =
         IO.File.ReadAllLines "day2.txt"
-        |> Array.where (fun line ->
-            match line with
+        |> Array.where (function
             | PasswordSpec spec -> checkSpec spec)
         |> Array.length
 
@@ -233,7 +226,7 @@ module Day4 =
         |> Array.forall validField
 
     let runner () =
-        String.Join("\n", IO.File.ReadAllLines "day4.txt").Split("\n\n")
+        (IO.File.ReadAllText "day4.txt").Split("\n\n")
         |> Array.where mandatoryFieldsPresent
         // Comment out below line to just get part 1
         |> Array.where allFieldsValid
@@ -309,11 +302,11 @@ module Day6 =
         |> Set.count
 
     let runner () =
-        String.Join("\n", IO.File.ReadAllLines "day6.txt").Split("\n\n")
+        (IO.File.ReadAllText "day6.txt").Split("\n\n")
         // change this to countGroupAnswers2 for part 2
         |> Array.sumBy countGroupAnswers
 
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day6.runner())
-    0 // return an integer exit code
+    printfn "%A" (Day2.runner())
+    0
