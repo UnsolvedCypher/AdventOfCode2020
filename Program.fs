@@ -2,6 +2,25 @@
 
 open System
 
+// Easy helper to let us confirm that something is an int
+let (|Int|_|) str =
+    match System.Int32.TryParse(str:string) with
+    | (true,int) -> Some(int)
+    | _ -> None
+
+// Helper to use matching on prefix of string via https://stackoverflow.com/a/3722671
+let (|Prefix|_|) (p:string) (s:string) =
+    if s.StartsWith(p) then
+        Some(s.Substring(p.Length))
+    else
+        None
+
+let (|Suffix|_|) (p:string) (s:string) =
+    if s.EndsWith(p) then
+        Some(s.[.. s.Length - p.Length - 1])
+    else
+        None
+
 module Day1 =
     let inputList =
         IO.File.ReadAllLines "day1.txt"
@@ -121,24 +140,6 @@ module Day4 =
         )
         |> (List.length >> (<=) 7)
 
-    // Easy helper to let us confirm that something is an int
-    let (|Int|_|) str =
-       match System.Int32.TryParse(str:string) with
-       | (true,int) -> Some(int)
-       | _ -> None
-
-    // Helper to use matching on prefix of string via https://stackoverflow.com/a/3722671
-    let (|Prefix|_|) (p:string) (s:string) =
-        if s.StartsWith(p) then
-            Some(s.Substring(p.Length))
-        else
-            None
-
-    let (|Suffix|_|) (p:string) (s:string) =
-        if s.EndsWith(p) then
-            Some(s.[.. s.Length - p.Length - 1])
-        else
-            None
 
     let (|IntInRange|_|) minYear maxYear (s: string) =
         match s with
@@ -306,7 +307,87 @@ module Day6 =
         // change this to countGroupAnswers2 for part 2
         |> Array.sumBy countGroupAnswers
 
+module Day7 =
+    type BagRule = string * ((int * string) Set)
+
+    let (|BagName|) (str: string) =
+        match str.Replace(".", "") with
+        | Suffix " bags" rest -> rest
+        | Suffix " bag" rest -> rest
+        | _ ->
+            failwithf("Unable to parse bag name")
+
+    let (|NumberedBagName|) (str: string) =
+        let number = str.Split(" ").[0] |> int
+        match str.[(str.IndexOf(" ") + 1) ..] with
+        | BagName b -> (number, b)
+
+    let (|BagRule|) (str: string) =
+        match str.Split(" contain ") with
+        | [|(BagName container); "no other bags."|] ->
+            (container, Set.empty)
+        | [|(BagName container); rest|] ->
+            let contents =
+                rest.Split(", ")
+                |> Set.ofArray
+                |> Set.map (function | NumberedBagName n -> n)
+            (container, contents)
+        | _ -> failwith("Could not parse bag rule")
+
+    let parents (bagTree: BagRule Set) (color: string) =
+        bagTree
+        |> Set.filter (fun r ->
+            (snd r) |> Set.exists (snd >> ((=) color))
+        )
+        |> Set.map fst
+
+    let rec bagsPossiblyContaining (bagTree: BagRule Set) (previouslyFoundBags: string Set) (retiredBags: string Set) =
+        let newlyFoundBags =
+            previouslyFoundBags
+            |> Set.map (parents bagTree)
+            |> Set.unionMany
+
+        let newlyRetired = Set.union previouslyFoundBags retiredBags
+
+        if Set.isEmpty newlyFoundBags
+        then newlyRetired |> Set.count
+        else
+            bagsPossiblyContaining bagTree newlyFoundBags newlyRetired
+
+    let rec bagsContained (bagTree: BagRule Set) (color: string) =
+        let immediateChildren =
+            bagTree
+            |> Set.filter (fst >> ((=) color))
+            |> Set.map snd
+            |> Set.unionMany
+            |> Set.toList
+
+        match immediateChildren with
+        | [] -> 0
+        | _ ->
+            (+)
+                (immediateChildren
+                |> List.sumBy fst)
+
+                (immediateChildren
+                |> List.sumBy (fun (n, c) -> n * (bagsContained bagTree c)))
+
+
+    let runner1 color =
+        let bagTree =
+            (IO.File.ReadAllLines "day7.txt")
+            |> Array.map (function | BagRule r -> r)
+            |> Set.ofArray
+        bagsPossiblyContaining bagTree (parents bagTree color) Set.empty
+
+    let runner2 color =
+        let bagTree =
+            (IO.File.ReadAllLines "day7.txt")
+            |> Array.map (function | BagRule r -> r)
+            |> Set.ofArray
+        bagsContained bagTree color
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day2.runner())
+    printfn "%A" (Day7.runner1 "shiny gold")
     0
