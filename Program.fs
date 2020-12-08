@@ -21,6 +21,34 @@ let (|Suffix|_|) (p:string) (s:string) =
     else
         None
 
+type SearchType<'a> = Min of 'a | Max of 'a | Any
+
+let comboSearch searchType condition lists =
+    let pickChild searchType children =
+        let existingChildren = children |> List.choose id
+        match existingChildren, searchType with
+        | [], _ -> None
+        | _, (Min _ | Any) -> Some (List.minBy (fst) existingChildren)
+        | _, (Max _) -> Some (List.maxBy (fst) existingChildren)
+
+    let rec findSelections searchType condition selections listOfLists =
+        match listOfLists with
+        | head :: tail ->
+            head
+            |> List.map (fun curr -> findSelections searchType condition (curr :: selections) tail)
+            |> pickChild searchType
+
+        | [] ->
+            if condition selections
+            then
+                match searchType with
+                | Max f | Min f -> Some (f selections, selections)
+                | Any -> Some (0, selections)
+            else
+                None
+
+    findSelections searchType condition [] lists
+
 module Day1 =
     let inputList =
         IO.File.ReadAllLines "day1.txt"
@@ -387,7 +415,55 @@ module Day7 =
             |> Set.ofArray
         bagsContained bagTree color
 
+module Day8 =
+
+    type ExitStatus = InfiniteLoop of int | RunToEnd of int | Error
+
+    let rec runCode (instructionList: string list) accumulator currIndex indexesRun =
+        let numInstructions = List.length instructionList
+        if Set.contains currIndex indexesRun
+            then InfiniteLoop accumulator
+        elif currIndex < 0 || currIndex > numInstructions
+            then Error
+        elif currIndex = numInstructions
+            then RunToEnd accumulator
+        else
+            let newIndexesRun = Set.add currIndex indexesRun
+            match instructionList.[currIndex] with
+            | Prefix "acc " (Int i) ->
+                runCode instructionList (accumulator + i) (currIndex + 1) newIndexesRun
+            | Prefix "jmp " (Int i) ->
+                runCode instructionList accumulator (currIndex + i) newIndexesRun
+            | Prefix "nop " (Int _) ->
+                runCode instructionList accumulator (currIndex + 1) newIndexesRun
+            | _ -> failwith("Invalid instruction")
+
+    let flipInstruction (instructions: string list) n =
+        let newInstruction =
+            match instructions.[n] with
+            | Prefix "jmp " rest -> "nop " + rest
+            | Prefix "nop " rest -> "jmp " + rest
+            | other -> other
+        List.append instructions.[.. (n - 1)] (newInstruction :: instructions.[(n + 1)..])
+
+
+    let runner () =
+        let input =
+            (IO.File.ReadAllLines "day8.txt")
+            |> List.ofArray
+
+        let part1 = runCode input 0 0 Set.empty
+
+        let part2 =
+            [0 .. (List.length input) - 1]
+            |> List.choose (fun n ->
+                    match runCode (flipInstruction input n) 0 0 Set.empty with
+                    | RunToEnd i -> Some i
+                    | _ -> None)
+
+        part1, part2
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day7.runner1 "shiny gold")
+    printfn "%A" (Day8.runner ())
     0
