@@ -463,7 +463,44 @@ module Day8 =
 
         part1, part2
 
+module Day9 =
+
+    let rec part1 (numbers: int64 list) =
+        let possibleSummers = numbers.[0 .. 24]
+        let currNumber = numbers.[25]
+
+        match comboSearch Any (fun n ->
+            n = List.distinct n && List.sum n = currNumber
+            ) [possibleSummers; possibleSummers] with
+        | Some _ ->
+            part1 numbers.[1..]
+        | None ->
+            currNumber
+
+    let rec part2 (numbers: int64 list) numberToMatch =
+        let numRange = [0 .. (List.length numbers)]
+
+        match comboSearch Any (fun n ->
+            n.[0] < n.[1] && (List.sum numbers.[n.[0] .. n.[1]]) = numberToMatch
+            ) [numRange; numRange] with
+        | Some n ->
+            let contiguous = numbers.[(snd n).[0] .. (snd n).[1]]
+            (List.min contiguous + List.max contiguous)
+        | None ->
+            failwith("No solution found")
+
+    let runner () =
+        let input =
+            (IO.File.ReadAllLines "day9.txt")
+            |> Array.map int64
+            |> List.ofArray
+
+        let firstAnswer = part1 input
+        let secondAnswer = part2 input firstAnswer
+
+        firstAnswer, secondAnswer
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day8.runner ())
+    printfn "%A" (Day9.runner ())
     0
