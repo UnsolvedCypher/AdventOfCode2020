@@ -500,7 +500,48 @@ module Day9 =
 
         firstAnswer, secondAnswer
 
+module Day10 =
+
+    let part1 ratings =
+        0 :: (List.append ratings [ratings.[(List.length ratings) - 1] + 3])
+        |> List.pairwise
+        |> List.map (fun (a, b) -> b - a)
+        |> List.countBy id
+
+    let numWaysToGetTo ratings (waysToGetToArr: int64 list) n =
+        match n, List.tryFindIndex ((=) n) ratings with
+        | 0, _ -> 1L
+        | _, Some index -> waysToGetToArr.[index]
+        | _, None -> 0L
+
+    let rec part2 ratings waysToGetToArr currIndex =
+        if currIndex = List.length ratings
+        then List.last waysToGetToArr
+        else
+            let waysToGetHere =
+                [1; 2; 3]
+                |> List.sumBy (fun n -> numWaysToGetTo ratings waysToGetToArr (ratings.[currIndex] - n))
+            part2 ratings (List.append waysToGetToArr [waysToGetHere]) (currIndex + 1)
+
+
+    let runner () =
+        (IO.File.ReadAllLines "day10.txt")
+        |> Array.map int
+        |> Array.sort
+        |> List.ofArray
+        |> part1
+
+    let runner2 () =
+        let input =
+            (IO.File.ReadAllLines "day10.txt")
+            |> Array.map int
+            |> Array.sort
+            |> List.ofArray
+
+        part2 input [] 0
+
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day9.runner ())
+    printfn "%A" (Day10.runner2 ())
     0
