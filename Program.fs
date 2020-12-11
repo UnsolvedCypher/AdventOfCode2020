@@ -540,8 +540,63 @@ module Day10 =
 
         part2 input [] 0
 
+module Day11 =
+
+    let rec occupiedAt seats seatRow seatCol rowFun colFun keepGoing =
+        match rowFun seatRow, colFun seatCol with
+        | r, c when r >= 0 && r < (List.length seats) && c >= 0 && c < (String.length seats.[0]) ->
+            match seats.[r].[c] with
+            | '#' -> true
+            | '.' -> if keepGoing then occupiedAt seats r c rowFun colFun keepGoing else false
+            | _ -> false
+        | _ -> false
+
+
+    let newSeatState seats keepGoing neighborThreshold (seatRow, seatCol) =
+        let numNeighbors =
+            [
+                ((+)  1), ((+)  0)
+                ((+) -1), ((+)  0)
+                ((+)  0), ((+)  1)
+                ((+)  0), ((+) -1)
+                ((+)  1), ((+)  1)
+                ((+) -1), ((+) -1)
+                ((+)  1), ((+) -1)
+                ((+) -1), ((+)  1)
+            ]
+            |> List.filter (fun (rowFun, colFun) ->
+                occupiedAt seats seatRow seatCol rowFun colFun keepGoing)
+            |> List.length
+
+        match seats.[seatRow].[seatCol], numNeighbors with
+        | 'L', 0 -> '#'
+        | '#', n when n >= neighborThreshold -> 'L'
+        | s, _ -> s
+
+    let rec occupiedAfterEquilibrium keepGoing neighborThreshold seats =
+        let newSeats =
+            seats
+            |> List.mapi (fun r row ->
+                row
+                |> Seq.mapi (fun c _ -> (newSeatState seats keepGoing neighborThreshold (r, c)) |> string)
+                |> String.concat ""
+            )
+
+        if (seats = newSeats)
+        then seats |> List.sumBy (fun l -> l |> Seq.filter ((=) '#') |> Seq.length)
+        else occupiedAfterEquilibrium keepGoing neighborThreshold newSeats
+
+    let runner () =
+        (IO.File.ReadAllLines "day11.txt")
+        |> List.ofArray
+        |> occupiedAfterEquilibrium false 4,
+
+        (IO.File.ReadAllLines "day11.txt")
+        |> List.ofArray
+        |> occupiedAfterEquilibrium true 5
+
 
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day10.runner2 ())
+    printfn "%A" (Day11.runner ())
     0
