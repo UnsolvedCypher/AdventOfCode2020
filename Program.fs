@@ -592,8 +592,105 @@ module Day11 =
         (IO.File.ReadAllLines "day11.txt")
         |> occupiedAfterEquilibrium true 5
 
+module Day12 =
+
+    type Direction = North | South | East | West
+
+    let rec rotateShipRight currDirection degrees =
+        if degrees = 0
+        then currDirection
+        else
+            match currDirection with
+            | North -> rotateShipRight East (degrees - 90)
+            | East -> rotateShipRight South (degrees - 90)
+            | South -> rotateShipRight West (degrees - 90)
+            | West -> rotateShipRight North (degrees - 90)
+
+    let rec finalShipPosition northPos eastPos direction instructions =
+        match instructions with
+        instruction :: rest ->
+            let mutable newNorth, newEast, newDirection = northPos, eastPos, direction
+            match instruction with
+            | Prefix "N" (Int amount) ->
+                newNorth <- northPos + amount
+            | Prefix "S" (Int amount) ->
+                newNorth <- northPos - amount
+            | Prefix "E" (Int amount) ->
+                newEast <- eastPos + amount
+            | Prefix "W" (Int amount) ->
+                newEast <- eastPos - amount
+            | Prefix "L" (Int amount) ->
+                newDirection <- rotateShipRight direction (-amount + 360)
+            | Prefix "R" (Int amount) ->
+                newDirection <- rotateShipRight direction amount
+            | Prefix "F" (Int amount) ->
+                match direction with
+                | North ->
+                    newNorth <- northPos + amount
+                | South ->
+                    newNorth <- northPos - amount
+                | East ->
+                    newEast <- eastPos + amount
+                | West ->
+                    newEast <- eastPos - amount
+            | _ ->
+                failwith "No such instruction"
+
+            finalShipPosition newNorth newEast newDirection rest
+        | [] ->
+            Math.Abs(northPos) + Math.Abs(eastPos)
+
+    let rec moveWaypointBy north east waypointPos =
+        let waypointNorth, waypointEast = waypointPos
+        waypointNorth + north, waypointEast + east
+
+    let rec rotateWaypoint (shipNorth, shipEast) (waypointNorth, waypointEast) degrees =
+        if degrees = 0
+        then (waypointNorth, waypointEast)
+        else
+            let (relativeNorth, relativeEast) = (waypointNorth - shipNorth, waypointEast - shipEast)
+            rotateWaypoint (shipNorth, shipEast) (-relativeEast + shipNorth, relativeNorth + shipEast) (degrees - 90)
+
+    let rec finalShipPosition2 (shipPos: int * int) (waypointPos: int * int) instructions =
+        match instructions with
+        | instruction :: rest ->
+            let mutable (newShipPos, newWaypointPos) = (shipPos, waypointPos)
+            match instruction with
+            | Prefix "N" (Int amount) ->
+                newWaypointPos <- moveWaypointBy amount 0 waypointPos
+            | Prefix "S" (Int amount) ->
+                newWaypointPos <- moveWaypointBy -amount 0 waypointPos
+            | Prefix "E" (Int amount) ->
+                newWaypointPos <- moveWaypointBy 0 amount waypointPos
+            | Prefix "W" (Int amount) ->
+                newWaypointPos <- moveWaypointBy 0 -amount waypointPos
+            | Prefix "L" (Int amount) ->
+                newWaypointPos <- (rotateWaypoint shipPos waypointPos (-amount + 360))
+            | Prefix "R" (Int amount) ->
+                newWaypointPos <- (rotateWaypoint shipPos waypointPos amount)
+            | Prefix "F" (Int amount) ->
+                let (shipNorth, shipEast), (waypointNorth, waypointEast) = (shipPos, waypointPos)
+                let northToMove = (waypointNorth - shipNorth) * amount
+                let eastToMove = (waypointEast - shipEast) * amount
+                newShipPos <- (shipNorth + northToMove, shipEast + eastToMove)
+                newWaypointPos <- (waypointNorth + northToMove, waypointEast + eastToMove)
+            | _ ->
+                failwith "No such instruction"
+            finalShipPosition2 newShipPos newWaypointPos rest
+        | [] ->
+            let shipNorth, shipEast = shipPos
+            Math.Abs(shipNorth) + Math.Abs(shipEast)
+
+    let runner () =
+        IO.File.ReadAllLines "day12.txt"
+        |> List.ofArray
+        |> finalShipPosition 0 0 East,
+
+        IO.File.ReadAllLines "day12.txt"
+        |> List.ofArray
+        |> finalShipPosition2 (0, 0) (1, 10)
 
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day11.runner ())
+    printfn "%A" (Day12.runner ())
     0
