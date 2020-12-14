@@ -8,6 +8,11 @@ let (|Int|_|) str =
     | (true,int) -> Some(int)
     | _ -> None
 
+let (|Int64|_|) str =
+    match System.Int64.TryParse(str:string) with
+    | (true,int) -> Some(int)
+    | _ -> None
+
 // Helper to use matching on prefix of string via https://stackoverflow.com/a/3722671
 let (|Prefix|_|) (p:string) (s:string) =
     if s.StartsWith(p) then
@@ -652,6 +657,7 @@ module Day12 =
             rotateWaypoint (shipNorth, shipEast) (-relativeEast + shipNorth, relativeNorth + shipEast) (degrees - 90)
 
     let rec finalShipPosition2 (shipPos: int * int) (waypointPos: int * int) instructions =
+        printfn "Ship: %A, Waypoint: %A" shipPos waypointPos
         match instructions with
         | instruction :: rest ->
             let mutable (newShipPos, newWaypointPos) = (shipPos, waypointPos)
@@ -690,7 +696,163 @@ module Day12 =
         |> List.ofArray
         |> finalShipPosition2 (0, 0) (1, 10)
 
+module Day13 =
+
+    let rec findNearestGreaterMultiple n multipleOf =
+        if n % multipleOf = 0
+        then n
+        else findNearestGreaterMultiple (n + 1) multipleOf
+
+    let rec findNearestGreaterMultipleLong n multipleOf =
+        if n % multipleOf = 0L
+        then n
+        else findNearestGreaterMultipleLong (n + 1L) multipleOf
+
+    let part1 (busses: string) departureTime =
+        (Array.map ((fun b -> Int32.Parse(b)) >> (fun bus ->
+            bus, (findNearestGreaterMultiple departureTime bus) - departureTime)) (busses.Split(",")
+        |> Array.filter ((<>) "x")))
+        |> Array.minBy snd
+
+
+    let extendedEuclid a b =
+        let mutable mA, mB = a, b
+        let mutable x0, x1, y0, y1 = 0L, 1L, 1L, 0L
+        while mA <> 0L do
+            let q = mB / mA
+            let newMa = mB % mA
+            let newMb = mA
+            let newY0, newY1 = y1, y0 - q * y1
+            let newX0, newX1 = x1, x0 - q * x1
+            y0 <- newY0
+            y1 <- newY1
+            x0 <- newX0
+            x1 <- newX1
+            mA <- newMa
+            mB <- newMb
+        b, x0, y0
+
+    let modInverse (a, b) =
+        let g, x, _ = extendedEuclid (a % b) b
+        if g <> 1L
+        then (x + b) % b
+        else failwith "Could not compute modular inverse"
+
+    let part2 (busses: string) =
+        let busInfo =
+            busses.Split(",")
+            |> Array.indexed
+            |> Array.choose (fun (index, busStr) ->
+                match busStr with
+                | Int64 busNum -> Some (index |> int64, busNum)
+                | _ -> None
+
+            )
+
+        let ais = busInfo |> Array.map (fun (a, n) -> (n - a) % n)
+        let nis = busInfo |> Array.map snd
+
+        let bigN =
+            nis
+            |> Array.reduce ( * )
+
+        let yis = nis |> Array.map (fun ni -> bigN / ni)
+        let zis =
+            Array.zip yis nis
+            |> Array.map modInverse
+
+        let x =
+            Array.zip3 ais yis zis
+            |> Array.sumBy (fun (ai, yi, zi) -> ai * yi * zi)
+
+        (x % bigN)
+
+    let runner () =
+        let input = IO.File.ReadAllLines "day13.txt"
+        part1 (input.[1]) (Int32.Parse(input.[0])),
+        part2 (input.[1])
+
+module Day14 =
+    let getAllAddresses address (mask: string) =
+        let mutable xLocations = []
+        let baseAddress =
+            [|0 .. 35|]
+            |> Array.sumBy (fun i ->
+                match mask.[i] with
+                | 'X' ->
+                    xLocations <- i :: xLocations
+                    0L
+                | '1' ->
+                    1L <<< i
+                | '0' ->
+                    address &&& (1L <<< i)
+                | _ ->
+                    failwith "Could not parse mask"
+            )
+
+        [|0 .. (1 <<< List.length xLocations) - 1|]
+        |> Array.map (fun i ->
+            xLocations
+            |> List.indexed
+            |> List.sumBy (fun (index, location) ->
+                if ((1 <<< index) &&& i) > 0
+                then (1L <<< location)
+                else 0L)
+            |> (+) baseAddress
+        )
+
+    let applyValue memoryAddress value (mask: string) memorySpace =
+        let mutable result = 0L
+        [|0 .. 35|]
+        |> Array.iter (fun i ->
+            let valueToAdd =
+                match mask.[i] with
+                | 'X' ->
+                    value &&& (1L <<< i)
+                | '1' ->
+                    1L <<< i
+                | '0' ->
+                    0L
+                | _ ->
+                    failwith "Could not parse mask"
+            result <- result + valueToAdd
+        )
+
+        Map.add memoryAddress result memorySpace
+
+    let v2ApplyValue memoryAddress value (mask: string) memorySpace =
+        (memorySpace, getAllAddresses memoryAddress mask)
+        ||> Array.fold (fun map addr -> Map.add addr value map)
+
+    let (|MemoryAssignment|) (str: string) =
+        let firstBracket, secondBracket =
+            str.IndexOf("["), str.IndexOf("]")
+        let memoryAddress = Int64.Parse(str.Substring(firstBracket + 1, secondBracket - firstBracket - 1))
+
+        let value = Int64.Parse(str.Substring(str.IndexOf("=") + 1))
+
+        memoryAddress, value
+
+    let rec processInstructions instructions mask (memorySpace: Map<int64, int64>) applyValueFun =
+        match instructions with
+        | instruction :: rest ->
+            match instruction with
+            | Prefix "mask = " newMask ->
+                processInstructions rest (Seq.rev newMask |> Seq.map string |> String.concat "") memorySpace applyValueFun
+            | MemoryAssignment (address, value) ->
+                let newMemorySpace = applyValueFun address value mask memorySpace
+                processInstructions rest mask newMemorySpace applyValueFun
+        | [] ->
+            memorySpace
+            |> Map.toArray
+            |> Array.sumBy snd
+
+    let runner () =
+        processInstructions (IO.File.ReadAllLines "day14.txt" |> List.ofArray) "" Map.empty applyValue,
+        processInstructions (IO.File.ReadAllLines "day14.txt" |> List.ofArray) "" Map.empty v2ApplyValue
+
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day12.runner ())
+    printfn "%A" (Day14.runner ())
     0
