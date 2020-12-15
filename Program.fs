@@ -851,8 +851,37 @@ module Day14 =
         processInstructions (IO.File.ReadAllLines "day14.txt" |> List.ofArray) "" Map.empty applyValue,
         processInstructions (IO.File.ReadAllLines "day14.txt" |> List.ofArray) "" Map.empty v2ApplyValue
 
+module Day15 =
+
+    let rec nthInSequence (numberSet: Map<int, int>) previousNum turnNum maxTurns =
+        if turnNum = maxTurns - 1
+        then
+            previousNum
+        else
+            let nextNumber =
+                let lastSpoken =
+                    numberSet |> Map.tryFind previousNum
+                match lastSpoken with
+                | Some t -> turnNum - t
+                | None -> 0
+
+            nthInSequence (Map.add previousNum (turnNum) numberSet) nextNumber (turnNum + 1) maxTurns
+
+
+    let runner () =
+        let input =
+            (IO.File.ReadAllText "day15.txt").Split(",")
+            |> List.ofArray
+            |> List.map int
+        let inputSet =
+            input
+            |> List.mapi (fun i n -> n, i)
+            |> Map.ofList
+
+        nthInSequence inputSet 0 (List.length input) 2020,
+        nthInSequence inputSet 0 (List.length input) 30000000
 
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day14.runner ())
+    printfn "%A" (Day15.runner ())
     0
