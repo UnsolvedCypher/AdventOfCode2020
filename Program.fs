@@ -54,6 +54,14 @@ let comboSearch searchType condition lists =
 
     findSelections searchType condition [] lists
 
+let printExecutionTime f =
+    let stopWatch = System.Diagnostics.Stopwatch.StartNew()
+    let result = f ()
+    stopWatch.Stop()
+    printfn "Execution took %f" stopWatch.Elapsed.TotalMilliseconds
+    result
+
+
 module Day1 =
     let inputList =
         IO.File.ReadAllLines "day1.txt"
@@ -881,7 +889,110 @@ module Day15 =
         nthInSequence inputSet 0 (List.length input) 2020,
         nthInSequence inputSet 0 (List.length input) 30000000
 
+module Day16 =
+
+    let (|NumberRange|) (str: string) =
+        let first = str.Split("-").[0] |> int
+        let second = str.Split("-").[1] |> int
+        first, second
+
+    let (|FieldRule|) (str: string) =
+        let name = str.Split(": ").[0]
+        let values = str.Split(": ").[1].Split(" or ")
+        let firstRange, secondRange =
+            match values.[0], values.[1] with
+            | NumberRange first, NumberRange second ->
+                first, second
+
+        name, firstRange, secondRange
+
+    let inRange (rangeMin, rangeMax) number =
+        number >= rangeMin && number <= rangeMax
+
+    let validForRule number (_, firstRange, secondRange) =
+        (inRange firstRange number) || (inRange secondRange number)
+
+
+    let getValidTickets rules (tickets: int array[]) =
+
+        tickets
+        |> Array.where(fun t ->
+            t
+            |> Array.exists (fun n ->
+                rules
+                |> Array.forall (fun r -> not (validForRule n r)))
+            |> not)
+
+    let part1 rules (nearbyTickets: int array[]) =
+        let allNums = Array.collect id nearbyTickets
+
+        allNums
+        |> Array.where (fun n ->
+            rules
+            |> Array.forall (fun r -> not (validForRule n r)))
+        |> Array.sum
+
+    let ruleInPosition rule position tickets =
+        let values = Array.collect (fun (t: int array) -> [|t.[position]|]) tickets
+        // printfn "RIP for %d: nums are %A" position values
+        values
+        |> Array.forall (fun n -> validForRule n rule)
+
+    let rec assignPositions rulesWithPossiblePositions (currAssignments: string list) =
+        // printfn "Trying %A" currAssignments
+        let currPosition = (List.length currAssignments)
+        // printfn "cp is %d, rwpp is %d" currPosition (Array.length rulesWithPossiblePositions)
+        if Array.isEmpty rulesWithPossiblePositions
+        then
+            printfn "heyya"
+            Some(currAssignments)
+        else
+            let candidates =
+                rulesWithPossiblePositions
+                |> Array.filter (fun (_, positions) ->
+                    Set.contains currPosition positions
+                )
+
+            candidates
+            |> Array.tryPick (fun (candidateName, _) ->
+                let remainingRules =
+                    rulesWithPossiblePositions |> Array.filter (fun (name, _) -> name <> candidateName)
+                let result = assignPositions remainingRules (candidateName :: currAssignments)
+                result
+            )
+
+    let part2 rules tickets =
+        let rulesAndPossiblePositions =
+            rules
+            |> Array.map (fun r ->
+                let possibleIndexes =
+                    [0 .. (Array.length rules) - 1]
+                    |> List.where (fun i -> ruleInPosition r i tickets)
+                    |> Set.ofList
+                let name, _, _ = r
+                name, possibleIndexes
+            )
+        printfn "RAPP is %A" rulesAndPossiblePositions
+        match assignPositions rulesAndPossiblePositions [] with
+        | Some x -> x |> List.rev
+        | None -> []
+
+    let runner () =
+        let inputGroups = (IO.File.ReadAllText "day16.txt").Split("\n\n")
+        let rules =
+            inputGroups.[0].Split("\n")
+            |> Array.map (fun l -> match l with | FieldRule r -> r)
+        let myTicket =
+            inputGroups.[1].Split("\n").[1].Split(",") |> Array.map int
+
+        let nearbyTickets =
+            inputGroups.[2].Split("\n").[1 ..] |> Array.map (fun l ->
+                l.Split(",") |> Array.map int
+            )
+        let validTickets = getValidTickets rules (Array.append nearbyTickets [|myTicket|])
+        part2 rules validTickets
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day15.runner ())
+    printfn "%A" (Day16.runner ())
     0
