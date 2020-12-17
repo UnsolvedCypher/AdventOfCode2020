@@ -992,7 +992,89 @@ module Day16 =
         let validTickets = getValidTickets rules (Array.append nearbyTickets [|myTicket|])
         part2 rules validTickets
 
+module Day17 =
+
+    let get1dNeighborsAndSelf (x) =
+        [x; x + 1; x - 1]
+
+    let get2dNeighborsAndSelf (x, y) =
+        get1dNeighborsAndSelf x
+        |> List.collect (fun (nx) -> [nx, y; nx, y + 1; nx, y - 1])
+
+    let get3dNeighborsAndSelf (x, y, z) =
+        get2dNeighborsAndSelf (x, y)
+        |> List.collect (fun (nx, ny) -> [nx, ny, z; nx, ny, z + 1; nx, ny, z - 1])
+
+    let get4dNeighborsAndSelf (x, y, z, w) =
+        get3dNeighborsAndSelf (x, y, z)
+        |> List.collect (fun (nx, ny, nz) -> [nx, ny, nz, w; nx, ny, nz, w + 1; nx, ny, nz, w - 1])
+
+
+    let cubeIsActiveNextCycle gridState neighborFun cube =
+        let cubeCurrentlyActive = Set.contains cube gridState
+        let activeNeighborsAndSelf =
+            neighborFun cube
+            |> List.filter (fun n -> Set.contains n gridState)
+            |> List.length
+
+        match cubeCurrentlyActive, activeNeighborsAndSelf with
+        | true, (3 | 4) // 3 and 4 because the (active) cube itself is included in the count
+        | false, 3 -> true
+        | _, _ -> false
+
+
+    let rec performCycle numCycles neighborFun gridState =
+        if numCycles = 0
+        then gridState
+        else
+            let cubesAndTheirNeighbors =
+                Set.unionMany(
+                    gridState
+                    |> Set.map (neighborFun >> Set.ofList))
+
+            let nextGrid =
+                cubesAndTheirNeighbors
+                |> Set.filter (cubeIsActiveNextCycle gridState neighborFun)
+
+            performCycle (numCycles - 1) neighborFun nextGrid
+
+
+    let inputToGridState input =
+        input
+        |> Array.indexed
+        |> Array.collect (fun (x, rowContents) ->
+            rowContents
+            |> Seq.indexed
+            |> Seq.choose (fun (y, c) ->
+                match c with
+                | '#' -> Some (x, y)
+                | '.' -> None
+                | _ -> failwith "Unknown character in input")
+            |> Array.ofSeq)
+        |> Set.ofArray
+
+    let convert2dTo3dGrid grid =
+        grid
+        |> Set.map (fun (x, y) -> x, y, 0)
+
+    let convert2dTo4dGrid grid =
+        grid
+        |> Set.map (fun (x, y) -> x, y, 0, 0)
+
+    let runner () =
+        (IO.File.ReadAllLines "day17.txt")
+        |> inputToGridState
+        |> convert2dTo3dGrid
+        |> performCycle 6 get3dNeighborsAndSelf
+        |> Set.count,
+
+        (IO.File.ReadAllLines "day17.txt")
+        |> inputToGridState
+        |> convert2dTo4dGrid
+        |> performCycle 6 get4dNeighborsAndSelf
+        |> Set.count
+
 [<EntryPoint>]
 let main argv =
-    printfn "%A" (Day16.runner ())
+    printfn "%A" (Day17.runner ())
     0
